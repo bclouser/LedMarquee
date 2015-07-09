@@ -1,0 +1,8 @@
+*.o
+*.d
+*.bin
+*.hex
+*.axf
+*.S
+
+networkCredentials.h
