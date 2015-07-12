@@ -38,6 +38,8 @@
 #include "utils/uartstdio.h"
 
 #include "wifi.h"
+#include "marquee.h"
+#include "characters.h"
 
 // Global interruptFlag used to know when an interrupt occurred
 bool interruptHappened = false;
@@ -287,6 +289,16 @@ int main(void)
     char temp = 0;
     const unsigned timeoutLimit = 0x0000FFFF;
     memset(g_rxBuf, 0x00, g_rxBufLen);
+    static const short columnsPerChar = 6;
+
+    // frameBuf holds the row information for each column
+    RowNum frameBuf[120] = {0};
+
+    // Screen can handle 20 characters at a time
+    const char* frameString = "Ben Clouser is cool!";
+
+    UARTprintf("sizeof(RowNum) == %d\n", sizeof(RowNum));
+    UARTprintf("sizeof(short) == %d\n", sizeof(short));
 
     while(1<2)
     {
@@ -302,9 +314,33 @@ int main(void)
             {
                 turnAllRowsOff();
             }
+
+
+            // Build our buffer
+            memset(frameBuf, 0x0000, 120);
+            for(int i = 0; i < 120; ++i)
+            {
+                // Index characters with ascii characters -32 (cool right!?)
+                frameBuf[120-1-i] = characters[ frameString[i/6]-32][i-(6*(i/6))];
+            }
+
+            UARTprintf("H as int %d - 32 = %d\n", (unsigned)'H', 'H'-32 );
         }
 
+
+
+        putFrame(frameBuf);
+
+        /*
         // THis is what we do for the majority of the time
-        loopColumns();
+        while(numFrameUpdates<maxFramUpdates)
+        {
+            putFrame(frameBuf);
+            ++numFrameUpdates;
+        }
+
+        //shift frame buffer by one column
+        */
+
     }
 }

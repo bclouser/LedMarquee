@@ -13,21 +13,46 @@ typedef enum
     e_dmux8
 }DmuxType;
 
+
+// For rightside up
 typedef enum {
-    e_row1 = 1,
-    e_row2 = 2,
-    e_row3 = 3,
-    e_row4 = 4,
-    e_row5 = 5,
-    e_row6 = 6,
-    e_row7 = 7,
-    e_row8 = 8,
-    e_row9 = 9
+    rowsOff = 0x000,
+    row1 = 0x100,
+    row2 = 0x080,
+    row3 = 0x040,
+    row4 = 0x020,
+    row5 = 0x010,
+    row6 = 0x008,
+    row7 = 0x004,
+    row8 = 0x002,
+    row9 = 0x001,
+    allRows = 0x1FF
 }RowNum;
 
+
+/*
+// For upside down
+typedef enum {
+    rowsOff = 0x000,
+    row1 = 0x001,
+    row2 = 0x002,
+    row3 = 0x004,
+    row4 = 0x008,
+    row5 = 0x010,
+    row6 = 0x020,
+    row7 = 0x040,
+    row8 = 0x080,
+    row9 = 0x100,
+    allRows = 0x1FF
+}RowNum;
+*/
+
+
+void putFrame(RowNum* buf);
 void turnAllRowsOn();
 void turnAllRowsOff();
 void configureMarqueeLedPins();
 void loopColumns(); // meant to be called repeatedly in a loop
+void loopGrid();
 
 #endif

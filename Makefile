@@ -46,6 +46,7 @@ ${COMPILER}:
 ${COMPILER}/main.axf: ${COMPILER}/main.o
 ${COMPILER}/main.axf: ${COMPILER}/wifi.o
 ${COMPILER}/main.axf: ${COMPILER}/marquee.o
+${COMPILER}/main.axf: ${COMPILER}/characters.o
 ${COMPILER}/main.axf: ${COMPILER}/startup_${COMPILER}.o
 ${COMPILER}/main.axf: ${COMPILER}/uartstdio.o
 ${COMPILER}/main.axf: ${ROOT}/driverlib/${COMPILER}/libdriver.a

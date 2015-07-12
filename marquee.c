@@ -123,7 +123,7 @@ void setActiveDmux(DmuxType dmux)
     }
 }
 
-void setColumn(short columnNum)
+void setActiveColumn(short columnNum)
 {
     // It seems we need to turn off existing LEDS to start.
     setMuxAddr(0x00);
@@ -133,20 +133,20 @@ void setColumn(short columnNum)
 }
 
 // Good to remember that these guys are active low
-void setActiveRow(RowNum rowNum)
+void setActiveRows(RowNum rows)
 {
+    // bits: XXXX_XXX1_1111_1111
+
     // Start by setting(clearing, active low) all of them
     GPIO_PORTD_DATA_R |= 0x0F;
     GPIO_PORTE_DATA_R |= 0x3E;
 
-    if(rowNum < 6) // PORTE
-    {
-        GPIO_PORTE_DATA_R &= ~(1<<rowNum); 
-    }
-    else  // PORTD
-    {
-        GPIO_PORTD_DATA_R &= ~( 1<<(rowNum-6) );
-    }
+    // The rows number passed in is two bytes, representational of rows 1-9 as bits 0-8
+    // bits 1-5 on portE represent rows 1-5
+    GPIO_PORTE_DATA_R &= ~( (rows << 1) & 0x003E );
+
+    // bits 0-3 on portD represent rows 6-9
+    GPIO_PORTD_DATA_R &= ~( (rows>>5) & 0x00F );
 }
 
 void loopMux(unsigned dmuxIndex)
@@ -154,8 +154,8 @@ void loopMux(unsigned dmuxIndex)
     volatile uint32_t i;
     for(i = 0; i < 15; ++i)
     {
-        //UARTprintf("setColumn( (%d*15) + i) = %d \n",dmuxIndex, (dmuxIndex*15) + i);
-        setColumn( (dmuxIndex*15) + i );
+        //UARTprintf("setActiveColumn( (%d*15) + i) = %d \n",dmuxIndex, (dmuxIndex*15) + i);
+        setActiveColumn( (dmuxIndex*15) + i );
         SysCtlDelay(SysCtlClockGet()/190000);
     }
 }
@@ -177,47 +177,47 @@ void turnAllRowsOff()
 void loopColumns()
 {
     static unsigned ui32Loop = 0;
-    static unsigned dmuxIndex = 0;
-
-    // columns
-    if(dmuxIndex == 0){ // first time through
-        GPIO_PORTC_DATA_R |= 0x10; // column1
-    }
 
     //SysCtlDelay( SysCtlClockGet() );
-    for(ui32Loop = 0; ui32Loop < 120; ++ui32Loop)
-    {
-        // Check if we reached a dmux boundary
-        if((ui32Loop%15) == 0)
-        {
-            //UARTprintf("ui32Loop: %u... setActiveDmux(%u)\n",ui32Loop, dmuxIndex);
-            setActiveDmux(dmuxIndex); 
-            if(dmuxIndex < 8)
-            {
-                ++dmuxIndex;
-            }
-            else
-            {
-                dmuxIndex = 0;
-            }
-        }
-        setMuxAddr(ui32Loop%15+1);
-        // Delay for a bit.
-        //
+    for(ui32Loop = 0; ui32Loop < 120; ++ui32Loop) {
+        setActiveColumn(ui32Loop);
         SysCtlDelay( 100 );
+    }
+}
+
+// Stole this from stack overflow.
+int numberOfSetBits(int i)
+{
+     i = i - ((i >> 1) & 0x55555555);
+     i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+     return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
+// buffer better be 120 Rows long!!!
+void putFrame(RowNum* buf)
+{
+    static unsigned ui32Loop = 0;
+
+    for(int columnIndex= 0;  columnIndex< 120; ++columnIndex) {  
+        setActiveColumn(columnIndex);
+        setActiveRows( buf[columnIndex] );
+
+        // Brightness issues. Sigh. Tuning the delays for a uniform brightness
+        if( numberOfSetBits( buf[columnIndex] ) < 5)
+        {
+            SysCtlDelay( 100 );
+        }
+        else{
+            SysCtlDelay( 300 );
+        }
+       
+        turnAllRowsOff();
     }
 }
 
 void loopGrid()
 {
-    unsigned ui32Loop = 0;
-    unsigned dmuxIndex = 0;
-    // columns
-    GPIO_PORTC_DATA_R |= 0x10; // column1
-
-    // Rows
-    GPIO_PORTD_DATA_R &= ~0x0F;  // all rows o
-    GPIO_PORTE_DATA_R &= ~0x3E;  // all rows on
+    static unsigned ui32Loop = 0;
 
     while(1<2)
     {
@@ -225,28 +225,14 @@ void loopGrid()
         for(ui32Loop = 0; ui32Loop < 120; ++ui32Loop)
         {
             //UARTprintf("ui32Loop: %u... setActiveDmux(%u), setMuxAddr(%u); \n",ui32Loop, dmuxIndex, ui32Loop%15+1);
-            // Check if we reached a dmux boundary
-            if((ui32Loop%15) == 0)
-            {
-                setActiveDmux(dmuxIndex); 
-                if(dmuxIndex < 8)
-                {
-                    ++dmuxIndex;
-                }
-                else
-                {
-                    dmuxIndex = 0;
-                }
-            }
-            
-            setMuxAddr(ui32Loop%15+1);
+            setActiveColumn(ui32Loop);
 
             // Loop through each row
-            for(unsigned i = 1; i<10; i++)
+            for(unsigned i = 0; i<9; i++)
             {
-                setActiveRow(i);
+                setActiveRows(1<<i);
                 // Delay for a bit.
-                SysCtlDelay( SysCtlClockGet()/5000 );
+                SysCtlDelay( 100 );
             }  
         }
     }

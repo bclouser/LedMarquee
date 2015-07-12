@@ -193,7 +193,10 @@ bool configureWifiChip()
     int counter = 0;
     int i = 0;
 
+
     // TODO, Handle if the chip is in another baud rate
+
+
     if( !processRegularCommand("AT", "OK", 0, 0, 0) )
     {
     	return false;
@@ -222,9 +225,8 @@ bool configureWifiChip()
     }
 
     UARTprintf("Got past mode setting!\n");
-
-    // THe command looks like this "AT+CWJAP=myHomeNetworkName,catsAreCool"
-    if( !processRegularCommand(WIFI_ID_AND_PASS_CMD, "OK", 0, 0, 0) )
+    // WIFI_ID_AND_PASS_CMD looks like "AT+CWJAP=\"bittner\",\"catsAreCool\""
+    if( !processRegularCommand(WIFI_ID_AND_PASS_CMD,"OK", 0, 0, 0) )
     {
     	UARTprintf("Failed to connect to network\n");
     	return false;
