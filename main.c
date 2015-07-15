@@ -43,6 +43,8 @@
 
 // Global interruptFlag used to know when an interrupt occurred
 bool interruptHappened = false;
+// Treat the beginning of execution like we got new data
+bool gotNewData = true;
 //*****************************************************************************
 //
 //! \addtogroup example_list
@@ -289,13 +291,19 @@ int main(void)
     char temp = 0;
     const unsigned timeoutLimit = 0x0000FFFF;
     memset(g_rxBuf, 0x00, g_rxBufLen);
-    static const short columnsPerChar = 6;
+    static const short charWidth = 6;
+    unsigned numFrameUpdates = 0;
+    unsigned updatesPerScroll = 50;
+    // keep track of the overall columnOffset
+    unsigned columnOffset = 0;
+
+    unsigned numCharsInBuf = 87 + 20;
 
     // frameBuf holds the row information for each column
     RowNum frameBuf[120] = {0};
 
     // Screen can handle 20 characters at a time
-    const char* frameString = "Ben Clouser is cool!";
+    const char* rxString = "                    ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 ~!@#$\%^&*()_+`\\|?/.>,<";
 
     UARTprintf("sizeof(RowNum) == %d\n", sizeof(RowNum));
     UARTprintf("sizeof(short) == %d\n", sizeof(short));
@@ -321,26 +329,62 @@ int main(void)
             for(int i = 0; i < 120; ++i)
             {
                 // Index characters with ascii characters -32 (cool right!?)
-                frameBuf[120-1-i] = characters[ frameString[i/6]-32][i-(6*(i/6))];
+                frameBuf[120-1-i] = characters[ rxString[i/6]-32][i-(6*(i/6))];
             }
 
+            gotNewData = true;
             UARTprintf("H as int %d - 32 = %d\n", (unsigned)'H', 'H'-32 );
         }
 
-
-
-        putFrame(frameBuf);
-
-        /*
+        numFrameUpdates = 0;
         // THis is what we do for the majority of the time
-        while(numFrameUpdates<maxFramUpdates)
-        {
-            putFrame(frameBuf);
+        while(numFrameUpdates < updatesPerScroll)
+        { 
+            doFrame(frameBuf);
             ++numFrameUpdates;
+            //delay here to have time to stay off
+            //SysCtlDelay( 200 );
+            //turnAllRowsOff();
+            //disableAllDmux();
+            SysCtlDelay(80);
         }
 
         //shift frame buffer by one column
-        */
+        for(int i = 0; i < 120; ++i)
+        {
+            unsigned column = i+columnOffset;
+            
+            // Check if we are passed the end of the buffer
+            // Start putting in empty columns if we are
+            if(column/charWidth > numCharsInBuf)
+            {
+                frameBuf[120-1-i]=0x0000;
+            }
+            
+            else
+            {
+                char currentChar = ' ';
+                if(column/charWidth < numCharsInBuf)
+                {
+                    // given our current column, and character width, we get the current character.
+                    currentChar = rxString[(column)/charWidth];
+                }
+                // Fill from the end of the buffer first. So: frameBuf[119], frameBuf[118]... etc.
+                frameBuf[120-1-i] = characters[currentChar-32][column-(charWidth*(column/charWidth))];
+            }
+        }
 
+
+        // 6 columns per character in buffer
+        // to completely scroll all data off the screen
+        if( columnOffset >= (numCharsInBuf*6) )
+        {
+            columnOffset = 0;
+        }
+        else
+        {
+            ++columnOffset;
+        }
+        //SysCtlDelay(40);
     }
 }

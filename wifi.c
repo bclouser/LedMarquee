@@ -247,11 +247,24 @@ bool configureWifiChip()
     unsigned numChars = 130;
     memset(response, 0x00, maxLen);
     getValue("AT+CIFSR", response, numChars);
+    response[numChars-1] = '\0';
 
-    for(int i = 0; i<numChars; i++)
+    const char* staticIPstr = strstr(response, "STAIP");
+    UARTprintf("Value of staticIPstr: %s\n", staticIPstr);
+    // Find the closing quotation. Start looking after the first quote
+    const char* endString = strchr(&staticIPstr[5+2], '"');
+    if(endString == NULL)
     {
-        UARTprintf("response[%d] = %c (0x%02X)\n", i, (unsigned)response[i] );
+        UARTprintf("OK, we found the problem.. this guy is null!\n");
     }
+    char ipAddr[26];
+    UARTprintf("endstring = 0x%08X, &staticIPstr[5+2] = 0x%08X\n",endString, &staticIPstr[5+2]);
+    unsigned length = (endString > &staticIPstr[5+2])?(endString-&staticIPstr[5+2]):(&staticIPstr[5+2]-endString);
+
+    UARTprintf("length of ipAddr string: %u\n", length);
+    memcpy(ipAddr, &staticIPstr[5+2], length+1);
+    ipAddr[length] = '\0';
+    UARTprintf("IP Address: %s\n", ipAddr);
 
 
     if( !processRegularCommand("AT+CIPMUX=1", "OK", 0, 0, 0) )

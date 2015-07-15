@@ -83,6 +83,15 @@ void setMuxAddr(unsigned addr)
     GPIO_PORTC_DATA_R = temp;
 }
 
+void disableAllDmux()
+{
+    // THe dmux chip is active low
+    // ensure that PORT A select pins are unselected
+    GPIO_PORTA_DATA_R |= 0xFC;
+    // ensure that PORT F select pins are unselected
+    GPIO_PORTF_DATA_R |= 0x06;
+}
+
 void setActiveDmux(DmuxType dmux)
 {
     unsigned temp = 0;
@@ -194,25 +203,29 @@ int numberOfSetBits(int i)
 }
 
 // buffer better be 120 Rows long!!!
-void putFrame(RowNum* buf)
+void doFrame(RowNum* buf)
 {
     static unsigned ui32Loop = 0;
 
-    for(int columnIndex= 0;  columnIndex< 120; ++columnIndex) {  
-        setActiveColumn(columnIndex);
-        setActiveRows( buf[columnIndex] );
+    for(int columnIndex = 0;  columnIndex< 120; ++columnIndex) {  
 
+        setActiveColumn(columnIndex);
+        SysCtlDelay(30);  //columns need some ticks to become active
+        setActiveRows( buf[columnIndex] );
+        
         // Brightness issues. Sigh. Tuning the delays for a uniform brightness
         if( numberOfSetBits( buf[columnIndex] ) < 5)
         {
-            SysCtlDelay( 100 );
+           SysCtlDelay( 5 );
         }
         else{
-            SysCtlDelay( 300 );
+           SysCtlDelay( 15 );
         }
-       
+
         turnAllRowsOff();
+        SysCtlDelay(30);
     }
+    turnAllRowsOff();
 }
 
 void loopGrid()
