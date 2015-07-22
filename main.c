@@ -27,6 +27,7 @@
 #include <stdbool.h>
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
+#include "inc/hw_ints.h"
 #include "driverlib/debug.h"
 #include "driverlib/fpu.h"
 #include "driverlib/gpio.h"
@@ -70,9 +71,14 @@ __error__(char *pcFilename, uint32_t ui32Line)
 }
 #endif
 
+// g_rxBuf holds the raw data read from the UART
+const int g_rxMaxBufLen = 256+20;
+int g_rxBufLen = 0;
+char g_rxBuf[256+20] = {0};
 
-const int g_rxBufLen = 140;
-char g_rxBuf[140] = {0};
+// g_currentDisplayString holds the string to display on the matrix
+int g_currentDisplayStrLen = 0;
+char g_currentDisplayString[256+20] = {0};
 
 
 
@@ -81,7 +87,6 @@ char g_rxBuf[140] = {0};
 // Configure the UART and its pins.  This must be called before UARTprintf().
 //
 //*****************************************************************************
-void
 ConfigureUART(void)
 {
     //
@@ -137,10 +142,9 @@ void delay_s(int seconds)
 
 void uartCallback()
 {
-    interruptHappened = true;
     uint32_t ui32Interrupts;
 
-    //UARTprintf("INside uart callback!\n");
+    UARTprintf("INside uart callback!\n");
 
     //unsigned interruptNum = _UARTIntNumberGet(ui32Base);
 
@@ -170,7 +174,7 @@ void uartCallback()
     }
 
     // Disable interrupt line, so we don't get called while we are in here
-    IntDisable(22); 
+    IntDisable(INT_UART1_TM4C123); 
 
     //
     // Are we being interrupted due to a received character?
@@ -183,6 +187,7 @@ void uartCallback()
     char tempBuf[140] = {0};
     if(ui32Interrupts & (UART_INT_RX | UART_INT_RT))
     {
+        interruptHappened = true;
         while( !done )
         {
             if( UARTCharsAvail(UART1_BASE) )
@@ -192,17 +197,27 @@ void uartCallback()
             }
 
             // Commands should always end with a carriage return and newline
-            if( (i>=2) && (tempBuf[i-2] == '\r') && (tempBuf[i-1] == '\n') && !UARTCharsAvail(UART1_BASE) )
+            if( ((i>=2)||(i>=g_rxMaxBufLen)) && (tempBuf[i-2] == '\r') && (tempBuf[i-1] == '\n') )
             {
                 done = true;
+                // We need 20 extra bytes for leading spaces
+                g_rxBufLen = i+20;
+
+                // Ensure we got appropriate response
                 if( !strstr(tempBuf, "OK") )
                 {   
                     // Clear the global buffer
                     memset(g_rxBuf, 0x00, g_rxBufLen);
-                    // Copy the temp buffer into it
-                    strcpy(g_rxBuf, tempBuf);
+                    // Put in the leading spaces
+                    memset(g_rxBuf, ' ', 20);
+                    // Copy the temp buffer into it offset 20 spaces
+                    strcpy(&g_rxBuf[20], tempBuf);
+
+                    // Null terminate this guy
+                    g_rxBuf[(i-2) + 20] = '\0'; 
                 }
             }
+
             /*
             if( counter > timeoutLimit )
             {
@@ -225,13 +240,18 @@ void uartCallback()
         
     }
     // Turn interrupt back on
-    IntEnable(22);
+    IntEnable(INT_UART1_TM4C123);
 }
 
 
 
 int main(void)
 {
+
+    // Delay for a bit
+    //SysCtlDelay(80000000);
+
+
     //volatile uint32_t ui32Loop;
 
     //
@@ -275,12 +295,6 @@ int main(void)
     // register a guy to get called when the uart has data:
     UARTIntRegister(UART1_BASE, &uartCallback);
 
-    // aaaaaaaand enable the interrupts
-    UARTIntDisable(UART1_BASE, 0xFFFFFFFF);
-    UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
-    
-    // 22 is the interrupt line for Uart1
-    IntEnable(22);
 
     //
     // We are finished.  Hang around doing nothing.
@@ -290,52 +304,64 @@ int main(void)
     bool done = false;
     char temp = 0;
     const unsigned timeoutLimit = 0x0000FFFF;
-    memset(g_rxBuf, 0x00, g_rxBufLen);
+    memset(g_rxBuf, 0x00, g_rxMaxBufLen);
     static const short charWidth = 6;
     unsigned numFrameUpdates = 0;
-    unsigned updatesPerScroll = 50;
+    unsigned updatesPerScroll = 4;
     // keep track of the overall columnOffset
     unsigned columnOffset = 0;
 
-    unsigned numCharsInBuf = 87 + 20;
+    //unsigned numCharsInBuf = 117 + 20;
 
     // frameBuf holds the row information for each column
     RowNum frameBuf[120] = {0};
 
     // Screen can handle 20 characters at a time
-    const char* rxString = "                    ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 ~!@#$\%^&*()_+`\\|?/.>,<";
-
+    //const char* rxString = "                    ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 ~!@#$\%^&*()_+`\\|?/.>,<";
+    //const char* rxString = "                    07/18/15. Weather: Sunny, ^96  67\% Chance of thunderstorms in the afternoon. Now Playing: How soon is now, The Smiths";
+    //const char* rxString = "                    @essentialBenyc: I am getting pretty tired of looking at labels. Can't someone just tell me what is good for me?! #fuckTheGrocery @giantGroceryStore" ;
+    
+    // Initially we paint the screen with our ip address
+    char ipAddr[26] = {0};
+    if( getIpAddr(ipAddr) )
+    {
+        UARTprintf("IP Address: %s stringlen: %d\n", ipAddr, strlen(ipAddr));
+        memcpy(&g_currentDisplayString[20], ipAddr, strlen(ipAddr));
+        
+    }
+    else
+    {
+        UARTprintf("Problem getting an ip address\n");
+        memcpy(&g_currentDisplayString[20], "Error getting IP Address", strlen(ipAddr));
+    }
+    memset(g_currentDisplayString, (unsigned)' ', 20);
+    // white space +the len + single space for the null character
+    g_currentDisplayStrLen = (20+strlen(ipAddr));
+    g_currentDisplayString[g_currentDisplayStrLen] = '\0';
+    
+    UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
+    UARTprintf("g_currentDisplayString: %s\n", g_currentDisplayString);
     UARTprintf("sizeof(RowNum) == %d\n", sizeof(RowNum));
     UARTprintf("sizeof(short) == %d\n", sizeof(short));
+    UARTprintf("Character number(utf) == %d as hex: 0x%8X\n", '\u25B2', '\u25B2');
+
+
+
+    // aaaaaaaand enable the interrupts
+    UARTIntDisable(UART1_BASE, 0xFFFFFFFF);
+    UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
+    
+    // 22 is the interrupt line for Uart1
+    IntEnable(22);
+
+    SysCtlDelay(500000);
+    UARTprintf("Now beginning main loop...\n");
+    // BAND-AID! Need to figure out why this is getting triggered.
+    // I probably need to flush the UART before enabling interrupts
+    interruptHappened = false;
 
     while(1<2)
     {
-        if(interruptHappened)
-        {
-            interruptHappened = false;
-
-            if( strstr(g_rxBuf, "turn lights on") )
-            {
-                turnAllRowsOn();
-            }
-            else
-            {
-                turnAllRowsOff();
-            }
-
-
-            // Build our buffer
-            memset(frameBuf, 0x0000, 120);
-            for(int i = 0; i < 120; ++i)
-            {
-                // Index characters with ascii characters -32 (cool right!?)
-                frameBuf[120-1-i] = characters[ rxString[i/6]-32][i-(6*(i/6))];
-            }
-
-            gotNewData = true;
-            UARTprintf("H as int %d - 32 = %d\n", (unsigned)'H', 'H'-32 );
-        }
-
         numFrameUpdates = 0;
         // THis is what we do for the majority of the time
         while(numFrameUpdates < updatesPerScroll)
@@ -346,7 +372,38 @@ int main(void)
             //SysCtlDelay( 200 );
             //turnAllRowsOff();
             //disableAllDmux();
-            SysCtlDelay(80);
+            //SysCtlDelay(80);
+        }
+
+        if(interruptHappened)
+        {
+            interruptHappened = false;
+
+            UARTprintf("interrupt flag set. Populating buffer\n");
+            // Set active length to new length of buffer
+            g_currentDisplayStrLen = g_rxBufLen;
+
+            UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
+            // Clear out existing display string
+            memset(g_currentDisplayString, 0x00, g_currentDisplayStrLen);
+            // Copy in the new display data
+            memcpy(g_currentDisplayString, g_rxBuf, g_currentDisplayStrLen);
+
+            //UARTprintf("g_currentDisplayString: %s\n", g_currentDisplayString);
+
+            /*
+            // Build our buffer
+            memset(frameBuf, 0x0000, 120);
+            for(int i = 0; i < 120; ++i)
+            {
+                // Index characters with ascii characters -32 (cool right!?)
+                frameBuf[120-1-i] = characters[ g_rxBuf[i/charWidth]-32][i-(charWidth*(i/charWidth))];
+                //frameBuf[120-1-i] = characters[currentChar-32][column-(charWidth*(column/charWidth))];
+            }
+            */
+
+            // Reset our column offset, we are restarting the scroll with the new data
+            columnOffset = 0;
         }
 
         //shift frame buffer by one column
@@ -356,7 +413,7 @@ int main(void)
             
             // Check if we are passed the end of the buffer
             // Start putting in empty columns if we are
-            if(column/charWidth > numCharsInBuf)
+            if(column/charWidth > g_currentDisplayStrLen)
             {
                 frameBuf[120-1-i]=0x0000;
             }
@@ -364,10 +421,10 @@ int main(void)
             else
             {
                 char currentChar = ' ';
-                if(column/charWidth < numCharsInBuf)
+                if(column/charWidth < g_currentDisplayStrLen)
                 {
                     // given our current column, and character width, we get the current character.
-                    currentChar = rxString[(column)/charWidth];
+                    currentChar = g_currentDisplayString[(column)/charWidth];
                 }
                 // Fill from the end of the buffer first. So: frameBuf[119], frameBuf[118]... etc.
                 frameBuf[120-1-i] = characters[currentChar-32][column-(charWidth*(column/charWidth))];
@@ -377,7 +434,7 @@ int main(void)
 
         // 6 columns per character in buffer
         // to completely scroll all data off the screen
-        if( columnOffset >= (numCharsInBuf*6) )
+        if( columnOffset >= (g_currentDisplayStrLen*6) )
         {
             columnOffset = 0;
         }

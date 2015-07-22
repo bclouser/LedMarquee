@@ -3,9 +3,8 @@
 #include <stdbool.h>
 
 
-
-
 bool configureWifiChip();
+bool getIpAddr(char* buf);
 
 
 

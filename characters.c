@@ -124,8 +124,8 @@ const RowNum characters[127][6] =
     },
     {
         //' 44 
-        0,
-        row8+row7,
+        row1,
+        row2,
         0,
         0,
         0,

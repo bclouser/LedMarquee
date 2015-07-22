@@ -212,18 +212,20 @@ void doFrame(RowNum* buf)
         setActiveColumn(columnIndex);
         SysCtlDelay(30);  //columns need some ticks to become active
         setActiveRows( buf[columnIndex] );
-        
+        /*
         // Brightness issues. Sigh. Tuning the delays for a uniform brightness
         if( numberOfSetBits( buf[columnIndex] ) < 5)
         {
-           SysCtlDelay( 5 );
+           SysCtlDelay( 400 );
         }
         else{
-           SysCtlDelay( 15 );
+           SysCtlDelay( 500 );
         }
+        */
+        SysCtlDelay(450);
 
         turnAllRowsOff();
-        SysCtlDelay(30);
+        SysCtlDelay(1000);
     }
     turnAllRowsOff();
 }

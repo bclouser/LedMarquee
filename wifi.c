@@ -4,6 +4,11 @@
 #include <string.h>
 #include <stdbool.h>
 
+/* these are required for regex*/
+typedef int off_t;
+typedef int regoff_t;
+#include <regex.h>
+
 #include "driverlib/uart.h"
 #include "utils/uartstdio.h"
 #include "driverlib/sysctl.h"
@@ -23,6 +28,33 @@ bool processRegularCommand(char* atCommand, char* waitForString, unsigned retryL
     int i = 0;
     int index = 0;
     unsigned retryCounter = 0;
+
+/*
+    regex_t regex;
+    int reti;
+    // Compile regular expression
+    reti = regcomp(&regex, "^a[[:alnum:]]", 0);
+    if (reti) {
+        UARTprintf("Could not compile regex\n");
+        return;
+    }
+
+    // Execute regular expression
+    reti = regexec(&regex, "abc", 0, NULL, 0);
+    if (!reti) {
+        UARTprintf("Match");
+    }
+    else if (reti == REG_NOMATCH) {
+        UARTprintf("No match");
+    }
+    else {
+        UARTprintf("Regex match failed!\n");
+    }
+
+    // Free compiled regular expression if you want to use the regex_t again
+    regfree(&regex);
+    */
+
 
     // Take control of the stdio UART
     // The wifi chip is connected to UART1
@@ -244,28 +276,6 @@ bool configureWifiChip()
 
     UARTprintf("Got past getting an ip address: %s\n", response);
 
-    unsigned numChars = 130;
-    memset(response, 0x00, maxLen);
-    getValue("AT+CIFSR", response, numChars);
-    response[numChars-1] = '\0';
-
-    const char* staticIPstr = strstr(response, "STAIP");
-    UARTprintf("Value of staticIPstr: %s\n", staticIPstr);
-    // Find the closing quotation. Start looking after the first quote
-    const char* endString = strchr(&staticIPstr[5+2], '"');
-    if(endString == NULL)
-    {
-        UARTprintf("OK, we found the problem.. this guy is null!\n");
-    }
-    char ipAddr[26];
-    UARTprintf("endstring = 0x%08X, &staticIPstr[5+2] = 0x%08X\n",endString, &staticIPstr[5+2]);
-    unsigned length = (endString > &staticIPstr[5+2])?(endString-&staticIPstr[5+2]):(&staticIPstr[5+2]-endString);
-
-    UARTprintf("length of ipAddr string: %u\n", length);
-    memcpy(ipAddr, &staticIPstr[5+2], length+1);
-    ipAddr[length] = '\0';
-    UARTprintf("IP Address: %s\n", ipAddr);
-
 
     if( !processRegularCommand("AT+CIPMUX=1", "OK", 0, 0, 0) )
     {
@@ -304,3 +314,29 @@ bool processRegularCommand( ATCommandEnum atCommand )
 }
 
 */
+
+bool getIpAddr(char* buf)
+{
+    char response[130] = {0};
+    unsigned numChars = 130;
+    getValue("AT+CIFSR", response, numChars);
+    response[numChars-1] = '\0';
+
+    const char* staticIPstr = strstr(response, "STAIP");
+    //UARTprintf("Value of staticIPstr: %s\n", staticIPstr);
+    // Find the closing quotation. Start looking after the first quote
+    const char* endString = strchr(&staticIPstr[5+2], '"');
+    if(endString == NULL)
+    {
+        //UARTprintf("OK, we found the problem.. this guy is null!\n");
+        return false;
+    }
+    //UARTprintf("endstring = 0x%08X, &staticIPstr[5+2] = 0x%08X\n",endString, &staticIPstr[5+2]);
+    unsigned length = (endString > &staticIPstr[5+2])?(endString-&staticIPstr[5+2]):(&staticIPstr[5+2]-endString);
+
+    //UARTprintf("length of ipAddr string: %u\n", length);
+    memcpy(buf, &staticIPstr[5+2], length+1);
+    buf[length] = '\0';
+    return true;
+    //UARTprintf("IP Address: %s\n", buf);
+}
