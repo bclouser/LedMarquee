@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
 #include "inc/hw_ints.h"
@@ -43,9 +44,9 @@
 #include "characters.h"
 
 // Global interruptFlag used to know when an interrupt occurred
-bool interruptHappened = false;
-// Treat the beginning of execution like we got new data
-bool gotNewData = true;
+volatile bool interruptHappened = false;
+volatile bool g_rxSuccess = false;
+
 //*****************************************************************************
 //
 //! \addtogroup example_list
@@ -72,7 +73,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 #endif
 
 // g_rxBuf holds the raw data read from the UART
-#define RX_MAX_BUF_LEN 256
+#define RX_MAX_BUF_LEN 512
 int g_rxBufLen = 0;
 char g_rxBuf[RX_MAX_BUF_LEN] = {0};
 
@@ -125,8 +126,6 @@ ConfigureUART(void)
 }
 
 
-
-
 void delay_s(int seconds)
 {
     double secondsPerDelay = ( (1/SysCtlClockGet())*3 );
@@ -141,41 +140,37 @@ bool getUartDataBlocking()
 {
     int i = 0;
     unsigned counter = 0;
-    unsigned timeoutLimit = 0x0FFFFFFF;
+    unsigned timeoutLimit = 0xFFFF;
     bool timeout = false;
-    //char tempBuf[RX_MAX_BUF_LEN] = {0};
+
     // clear out the receive buffer
     memset(g_rxBuf, 0x00, RX_MAX_BUF_LEN);
-
     while( 1<2 )
     {
-        if( UARTCharsAvail(UART1_BASE) )
+        while(UARTCharsAvail(UART1_BASE))
         {
+            if(i >= RX_MAX_BUF_LEN)
+            {
+                return false;
+            }
             g_rxBuf[i] = (char)UARTCharGetNonBlocking(UART1_BASE);
-            i++;
+            ++i;
             g_rxBufLen = i;
         }
 
-
-        // Commands should always end with a carriage return and newline
-        if( i>=RX_MAX_BUF_LEN )
+        if( g_rxBufLen >= RX_MAX_BUF_LEN )
         {
-            //UARTprintf("exceeded max buffer len\n");
             return false;
         }
-        else if( strstr(g_rxBuf, "OK") )
-        {
-            return true;
-        } 
         else if( counter > timeoutLimit )
         {
-            //UARTprintf("Timeout... returning false\n");
-            timeout = true;
+            return true;
         }
 
         counter++;
         //UARTprintf("received: %c\n", (char)UARTCharGetNonBlocking(UART1_BASE));
     }
+    return false;
 }
 void uartCallback()
 {
@@ -183,49 +178,28 @@ void uartCallback()
 
     //unsigned interruptNum = _UARTIntNumberGet(ui32Base);
 
-
     //
     // Get and clear the current interrupt source(s)
     //
     ui32Interrupts = UARTIntStatus(UART1_BASE, true);
     UARTIntClear(UART1_BASE, ui32Interrupts);
+    // Disable interrupt line, so we don't get called while we are in here
+    IntDisable(INT_UART1_TM4C123); 
 
     //
     // Are we being interrupted because the TX FIFO has space available?
     if(ui32Interrupts & UART_INT_TX)
     {
-        //
-        // Move as many bytes as we can into the transmit FIFO.
-        //
-        //UARTPrimeTransmit(UART1_BASE);
 
-        //
-        // If the output buffer is empty, turn off the transmit interrupt.
-        //
-        //if(TX_BUFFER_EMPTY)
-        //{
-        //    UARTIntDisable(UART1_BASE, UART_INT_TX);
-        //}
     }
-
-    // Disable interrupt line, so we don't get called while we are in here
-    IntDisable(INT_UART1_TM4C123); 
 
     //
     // Are we being interrupted due to a received character?
     //
-    if(ui32Interrupts & (UART_INT_RX | UART_INT_RT))
+    else if(ui32Interrupts & (UART_INT_RX | UART_INT_RT))
     {
         interruptHappened = true;
-           
-        /*
-        UARTprintf("received: %s\n", g_rxBuf);
-        for(int x = 0; x<strlen(g_rxBuf); x++)
-        {
-            UARTprintf("buf[%d]: %c=%d\n", x, g_rxBuf[x], g_rxBuf[x]);
-        }
-        */
-        
+        g_rxSuccess = getUartDataBlocking();
     }
     // Turn interrupt back on
     IntEnable(INT_UART1_TM4C123);
@@ -235,13 +209,6 @@ void uartCallback()
 
 int main(void)
 {
-
-    // Delay for a bit
-    //SysCtlDelay(8000000);
-
-
-    //volatile uint32_t ui32Loop;
-
     //
     // Enable lazy stacking for interrupt handlers.  This allows floating-point
     // instructions to be used within interrupt handlers, but at the expense of
@@ -272,8 +239,6 @@ int main(void)
     UARTprintf("Ok, Start:\n");
     UARTprintf("ClockSpeed: %d\n", SysCtlClockGet());
 
-    UARTStdioConfig(0, 115200, 16000000);
-
 
     if( !configureWifiChip() )
     {
@@ -303,11 +268,6 @@ int main(void)
 
     // frameBuf holds the row information for each column
     RowNum frameBuf[120] = {0};
-
-    // Screen can handle 20 characters at a time
-    //const char* rxString = "                    ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 ~!@#$\%^&*()_+`\\|?/.>,<";
-    const char* rxString = "                    07/22/15. Weather: Sunny, ^96  67\% Chance of thunderstorms in the afternoon. Now Playing: How soon is now, The Smiths";
-    //const char* rxString = "                    @essentialBenyc: I am getting pretty tired of looking at labels. Can't someone just tell me what is good for me?! #fuckTheGrocery @giantGroceryStore" ;
     
     // Initially we paint the screen with our ip address
     char ipAddr[26] = {0};
@@ -335,7 +295,19 @@ int main(void)
 
 
     UARTprintf("Now beginning main loop...\n");
+
+    // among other things, this should flush the uART!
+    UARTStdioConfig(1, 115200, 16000000);
+
+    // Set it back though so we can print things...
     UARTStdioConfig(0, 115200, 16000000);
+
+
+    //
+    // Get and clear the current interrupt source(s)
+    //
+    int ui32Interrupts = UARTIntStatus(UART1_BASE, true);
+    UARTIntClear(UART1_BASE, ui32Interrupts);
 
     // aaaaaaaand enable the interrupts
     UARTIntDisable(UART1_BASE, 0xFFFFFFFF);
@@ -349,34 +321,84 @@ int main(void)
 
     while(1<2)
     {
-        /*
         if(interruptHappened)
         { 
-            // Data just came/is coming in from the Uart, we need to throw it into the rx buf.
-            bool success = getUartDataBlocking();
+            // Clear and turn interrupts off
+            int ui32Interrupts = UARTIntStatus(UART1_BASE, true);
+            UARTIntClear(UART1_BASE, ui32Interrupts);
+            IntDisable(INT_UART1_TM4C123);
 
             interruptHappened = false;
 
             //UARTprintf("interrupt flag set. Populating buffer\n");
-            // Set active length to new length of buffer
-            g_currentDisplayStrLen = g_rxBufLen+20;
+            if(g_rxSuccess)
+            {
+                // verify data is legit
+                int len = 0;
+                //sscanf(g_rxBuf, "+IPD,0,%d:", &len);
 
-            UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
-            // Clear out existing display string
-            memset(g_currentDisplayString, (unsigned)' ', g_currentDisplayStrLen);
-            // Copy in the new display data
-            memcpy(&g_currentDisplayString[20], ipAddr, g_currentDisplayStrLen);
+                //UARTprintf("Length based on header = %d\n", len);
 
-            UARTprintf("g_currentDisplayString: %s\n", g_currentDisplayString);
+                // Get the index for the start of our string (starts following colon)
+                char* begin = strchr(g_rxBuf, (int)':');
 
-            // Reset our column offset, we are restarting the scroll with the new data
-            columnOffset = 0;
+                if(begin != NULL)
+                {
+                    // string starts after the colon
+                    begin += 1;
+
+
+                    //if( len == (g_rxBufLen-(abs(g_rxBuf-begin))) )
+                    //{
+                        // Set active length to new length of buffer
+                        g_currentDisplayStrLen = g_rxBufLen + 20 - abs(g_rxBuf-begin);
+
+                        UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
+
+                        // Chop off the "0,CLOSED" at the end (if it exists)
+                        // 8 characters plus 2 for the /n, and /r
+                        if( strstr(begin+(g_currentDisplayStrLen-20-10), "CLOSED") != NULL )
+                        {
+                            UARTprintf("Found CLOSED at end of string... shortening length\n");
+                            g_currentDisplayStrLen -= 10;
+                        }
+                        else
+                        {
+                            UARTprintf("Did not find CLOSED at end of the string\n");
+                            // reduce the len to account for the last two /n and
+                            //g_currentDisplayStrLen -= 2;
+                        }
+
+                        UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
+
+                        // Clear out existing display string
+                        memset(g_currentDisplayString, (unsigned)' ', g_currentDisplayStrLen);
+                        // Copy in the new display data
+                        memcpy(&g_currentDisplayString[20], begin, g_currentDisplayStrLen - 20);
+
+                        UARTprintf("g_currentDisplayString: %s\n", g_currentDisplayString);
+
+                        // Reset our column offset, we are restarting the scroll with the new data
+                        columnOffset = 0;
+                    //}
+                    //else
+                    //{
+                    //    UARTprintf("Lengths do not match!\n");
+                    //}
+
+                }
+                else
+                {
+                    UARTprintf("begin was null\n");
+                }
+                
+            }
+
+            // Clear and turn interrupts back on
+            ui32Interrupts = UARTIntStatus(UART1_BASE, true);
+            UARTIntClear(UART1_BASE, ui32Interrupts);
+            IntEnable(INT_UART1_TM4C123);
         }
-        */
-
-        // CTHIS IS JUST DEBUG
-        g_currentDisplayStrLen = 117+20;
-        memcpy(&g_currentDisplayString[20], rxString, g_currentDisplayStrLen);
 
         //shift frame buffer by one column
         for(int i = 0; i < 120; ++i)

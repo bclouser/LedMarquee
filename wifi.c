@@ -29,32 +29,6 @@ bool processRegularCommand(char* atCommand, char* waitForString, unsigned retryL
     int index = 0;
     unsigned retryCounter = 0;
 
-/*
-    regex_t regex;
-    int reti;
-    // Compile regular expression
-    reti = regcomp(&regex, "^a[[:alnum:]]", 0);
-    if (reti) {
-        UARTprintf("Could not compile regex\n");
-        return;
-    }
-
-    // Execute regular expression
-    reti = regexec(&regex, "abc", 0, NULL, 0);
-    if (!reti) {
-        UARTprintf("Match");
-    }
-    else if (reti == REG_NOMATCH) {
-        UARTprintf("No match");
-    }
-    else {
-        UARTprintf("Regex match failed!\n");
-    }
-
-    // Free compiled regular expression if you want to use the regex_t again
-    regfree(&regex);
-    */
-
 
     // Take control of the stdio UART
     // The wifi chip is connected to UART1
@@ -93,34 +67,6 @@ bool processRegularCommand(char* atCommand, char* waitForString, unsigned retryL
         {
             rxBuf[index] = (char)UARTCharGetNonBlocking(UART1_BASE);
             index++;
-	        
-	        // Go until we get a carriage return
-			//while( rxBuf[i-1] != '\n' );
-            /*
-	        UARTStdioConfig(0, 115200, 16000000);
-            
-            
-            for(i=0; i<=strlen(rxBuf); i++)
-            {
-            	UARTprintf("rxBuf[%d]: %c = %d\n", i, rxBuf[i], rxBuf[i]);
-            }
-            
-            
-            
-            //UARTprintf("wifi chip gave us: %s\n", rxBuf);
-
-            UARTStdioConfig(1, 115200, 16000000);
-
-            */
-			// At this point we have some chunk of characters
-	        //char expectedResponse[20] = {0};
-	        
-	        //Find the substring in the string
-	        /*response = strstr(rxBuf, waitForString);
-
-	        //sprintf(expectedResponse, "%s\r\n", waitForString);
-	        strcat(expectedResponse, waitForString);
-	        strcat(expectedResponse, "\r\n");*/
 
             if( strstr(rxBuf, waitForString) )
             {
@@ -296,24 +242,6 @@ bool configureWifiChip()
 	UARTprintf("Wifi module configured correctly\n");
 	return true;
 }
-
-/*
-// Regular commands require no response. Simple set and forget
-bool processRegularCommand( ATCommandEnum atCommand )
-{
-	char rxBuf[32] = {0};
-	UARTprintf( "%s\r", atCommandStr[atCommand] );
-
-	UARTgets(rxBuf, bufLen); //Blocks until we get something
-	if( strcmp(rxBuf, "ok") )
-	{
-		return true;
-	}
-
-	return false;
-}
-
-*/
 
 bool getIpAddr(char* buf)
 {
