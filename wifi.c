@@ -25,7 +25,6 @@ bool processRegularCommand(char* atCommand, char* waitForString, unsigned retryL
 	const unsigned rxBufLen = 200;
     char rxBuf[200] = {0};
     int counter = 0;
-    int i = 0;
     int index = 0;
     unsigned retryCounter = 0;
 
@@ -156,22 +155,11 @@ void getValue(char* atCommand, char* response, unsigned maxLen){
     memcpy(response, rxBuf, maxLen);
     UARTStdioConfig(0, 115200, 16000000);
     return;
-
-
-
-    // parse
 }
 
 
 bool configureWifiChip()
 {
-	const unsigned rxBufLen = 50;
-    char rxBuf[50] = {0};
-    bool done = false;
-    int counter = 0;
-    int i = 0;
-
-
     // TODO, Handle if the chip is in another baud rate
 
 

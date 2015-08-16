@@ -205,8 +205,6 @@ int numberOfSetBits(int i)
 // buffer better be 120 Rows long!!!
 void doFrame(RowNum* buf)
 {
-    static unsigned ui32Loop = 0;
-
     for(int columnIndex = 0;  columnIndex< 120; ++columnIndex) {  
 
         setActiveColumn(columnIndex);

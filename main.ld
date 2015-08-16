@@ -28,6 +28,8 @@ MEMORY
     SRAM (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00008000
 }
 
+_stack_size = 4K; 
+
 SECTIONS
 {
     .text :
@@ -64,4 +66,17 @@ SECTIONS
         *(COMMON)
         _ebss = .;
     } > SRAM
+
+    .bss : AT(ADDR(.data) + SIZEOF(.data))
+    {
+        _bss = .;
+        *(.bss*)
+        *(COMMON)
+        _ebss = .;
+    } > SRAM
+    _heap_bottom = .;                                          
+    _heap_top = ORIGIN(SRAM) + LENGTH(SRAM) - _stack_size;
+
+    _stack_bottom = _heap_top;                            
+    _stack_top = ORIGIN(SRAM) + LENGTH(SRAM);             
 }

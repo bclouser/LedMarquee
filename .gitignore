@@ -3,6 +3,5 @@
 *.bin
 *.hex
 *.axf
-*.S
 
 networkCredentials.h

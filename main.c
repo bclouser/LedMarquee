@@ -23,6 +23,7 @@
 //*****************************************************************************
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -73,7 +74,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 #endif
 
 // g_rxBuf holds the raw data read from the UART
-#define RX_MAX_BUF_LEN 512
+#define RX_MAX_BUF_LEN 800
 int g_rxBufLen = 0;
 char g_rxBuf[RX_MAX_BUF_LEN] = {0};
 
@@ -130,8 +131,6 @@ void delay_s(int seconds)
 {
     double secondsPerDelay = ( (1/SysCtlClockGet())*3 );
     double totalDelayCalls = seconds/secondsPerDelay;
-    UARTprintf("value passed to SysCtlDelay(): %f", totalDelayCalls );
-    UARTprintf("sizeof(double): %d", sizeof(double));
 
     SysCtlDelay( (int)totalDelayCalls );
 }
@@ -140,8 +139,7 @@ bool getUartDataBlocking()
 {
     int i = 0;
     unsigned counter = 0;
-    unsigned timeoutLimit = 0xFFFF;
-    bool timeout = false;
+    unsigned timeoutLimit = 0xFF;
 
     // clear out the receive buffer
     memset(g_rxBuf, 0x00, RX_MAX_BUF_LEN);
@@ -156,12 +154,17 @@ bool getUartDataBlocking()
             g_rxBuf[i] = (char)UARTCharGetNonBlocking(UART1_BASE);
             ++i;
             g_rxBufLen = i;
+
+            // everytime we get a character, we reset the timeout counter
+            counter = 0;
         }
 
         if( g_rxBufLen >= RX_MAX_BUF_LEN )
         {
             return false;
         }
+
+        // If we haven't gotten a character in a while. assume done
         else if( counter > timeoutLimit )
         {
             return true;
@@ -190,7 +193,7 @@ void uartCallback()
     // Are we being interrupted because the TX FIFO has space available?
     if(ui32Interrupts & UART_INT_TX)
     {
-
+        // Well, this should never happen
     }
 
     //
@@ -220,10 +223,7 @@ int main(void)
     // Set the clocking to run directly from the crystal.
     //
 
-    //ROM_SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ |
-    //                   SYSCTL_OSC_MAIN);
-
-    // Set the clock for 80 mhz... currently only getting 66.666666mhz
+    // Set the clock for 80 mhz
     SysCtlClockSet(SYSCTL_SYSDIV_2_5| SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | 
                                         SYSCTL_XTAL_16MHZ);  //80MHz
 
@@ -233,10 +233,8 @@ int main(void)
     //
     ConfigureUART();
 
-    //
-    // Hello!
-    //
     UARTprintf("Ok, Start:\n");
+    // ... Bug exists where it reports 66.666666mhz (not my bug)
     UARTprintf("ClockSpeed: %d\n", SysCtlClockGet());
 
 
@@ -252,19 +250,12 @@ int main(void)
     //
     // We are finished.  Hang around doing nothing.
     //
-    unsigned counter =0;
-    unsigned i = 0;
-    bool done = false;
-    char temp = 0;
-    const unsigned timeoutLimit = 0x0000FFFF;
     memset(g_rxBuf, 0x00, RX_MAX_BUF_LEN);
     static const short charWidth = 6;
     unsigned numFrameUpdates = 0;
     unsigned updatesPerScroll = 4;
     // keep track of the overall columnOffset
     unsigned columnOffset = 0;
-
-    //unsigned numCharsInBuf = 117 + 20;
 
     // frameBuf holds the row information for each column
     RowNum frameBuf[120] = {0};
@@ -275,12 +266,11 @@ int main(void)
     {
         UARTprintf("IP Address: %s stringlen: %d\n", ipAddr, strlen(ipAddr));
         memcpy(&g_currentDisplayString[20], ipAddr, strlen(ipAddr));
-        
     }
     else
     {
         UARTprintf("Problem getting an ip address\n");
-        memcpy(&g_currentDisplayString[20], "Error getting IP Address", strlen(ipAddr));
+        //memcpy(&g_currentDisplayString[20], "Error getting IP Address", strlen(ipAddr));
     }
     memset(g_currentDisplayString, (unsigned)' ', 20);
     // white space +the len + single space for the null character
@@ -291,7 +281,8 @@ int main(void)
     UARTprintf("g_currentDisplayString: %s\n", g_currentDisplayString);
     UARTprintf("sizeof(RowNum) == %d\n", sizeof(RowNum));
     UARTprintf("sizeof(short) == %d\n", sizeof(short));
-    UARTprintf("Character number(utf) == %d as hex: 0x%8X\n", '\u25B2', '\u25B2');
+    SysCtlDelay(100000);
+
 
 
     UARTprintf("Now beginning main loop...\n");
@@ -321,7 +312,7 @@ int main(void)
 
     while(1<2)
     {
-        if(interruptHappened)
+        if(interruptHappened && (columnOffset == 0))
         { 
             // Clear and turn interrupts off
             int ui32Interrupts = UARTIntStatus(UART1_BASE, true);
@@ -334,7 +325,7 @@ int main(void)
             if(g_rxSuccess)
             {
                 // verify data is legit
-                int len = 0;
+                //int len = 0;
                 //sscanf(g_rxBuf, "+IPD,0,%d:", &len);
 
                 //UARTprintf("Length based on header = %d\n", len);
@@ -366,7 +357,7 @@ int main(void)
                         {
                             UARTprintf("Did not find CLOSED at end of the string\n");
                             // reduce the len to account for the last two /n and
-                            //g_currentDisplayStrLen -= 2;
+                            g_currentDisplayStrLen -= 2;
                         }
 
                         UARTprintf("g_currentDisplayStrLen = %d\n", g_currentDisplayStrLen);
@@ -385,7 +376,6 @@ int main(void)
                     //{
                     //    UARTprintf("Lengths do not match!\n");
                     //}
-
                 }
                 else
                 {

@@ -23,6 +23,9 @@ VPATH=./utils
 #
 IPATH=./
 
+# Print out the compiler we are using
+$(info $$CC is [${CC}])
+
 #
 # The default rule, which causes the hello example to be built.
 #
@@ -47,6 +50,7 @@ ${COMPILER}/main.axf: ${COMPILER}/main.o
 ${COMPILER}/main.axf: ${COMPILER}/wifi.o
 ${COMPILER}/main.axf: ${COMPILER}/marquee.o
 ${COMPILER}/main.axf: ${COMPILER}/characters.o
+${COMPILER}/main.axf: ${COMPILER}/pseudoSysCalls.o
 ${COMPILER}/main.axf: ${COMPILER}/startup_${COMPILER}.o
 ${COMPILER}/main.axf: ${COMPILER}/uartstdio.o
 ${COMPILER}/main.axf: ${ROOT}/driverlib/${COMPILER}/libdriver.a
