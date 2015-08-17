@@ -106,11 +106,16 @@ def getWeather():
     displayStr = str(int(curTemp))+'`, '+'H:'+str(int(maxTemp))+'` L:'+str(int(minTemp))+"`"
     return displayStr
 
+def getTime():
+	timestr = now.strftime("%I:%M %p, %m/%d/%y")
+	# get rid of leading zero, if it exists
+	if( timestr[0] == '0'):
+		timestr= timestr[1:]
+	return timestr
 
-	
 
 #####################  MAIN  ######################
-dispStr = now.strftime("%I:%M %p, %m/%d/%y")+"  "+"  "+getWeather()+"  "+getCinemaString()
+dispStr = getTime()+"  "+"  "+getWeather()+"  "+getCinemaString()
 
 print "DisplayString: \n " + dispStr
 clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
