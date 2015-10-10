@@ -5,6 +5,7 @@ import datetime
 import socket
 import requests
 import json
+import sys
 
 # get the current time
 now = datetime.datetime.now()
@@ -49,7 +50,7 @@ def getCinemaString():
 
 						if( ('AM' not in timeString) or INCLUDE_AM):
 							hour = int(timeString.split(':')[0])
-							#compensate for the whole 24 hour madness
+							# compensate for the whole 24 hour madness
 							if( hour!=12 ):
 								hour+=12
 
@@ -65,16 +66,16 @@ def getCinemaString():
 	# compile list of all movies that still have showtimes today (get rid of past times)
 	moviesToDisplay = [ movie for movie in movies if movie.showTimes ]
 
-	print "OK, here are the movies we will actually display"
+	#print "OK, here are the movies we will actually display"
 	displayStr = ''
 	for j, movie in enumerate(moviesToDisplay):
 		if(j is not 0):
 			displayStr+=', '   #ending comma	
-		print movie.title
+		#print movie.title
 		displayStr += movie.title + " ("
 
 		for i, time in enumerate(movie.showTimes):
-			print "\t" + str(time)
+			#print "\t" + str(time)
 			# the first time through, we don't add a comma
 			if(i is not 0):
 				displayStr += ', '
@@ -91,20 +92,26 @@ def getCinemaString():
 	return displayStr
 
 def kelvinToFahr(tempk): 
-    return (tempk * 9/5 - 459.67) 
+	return (tempk * 9/5 - 459.67) 
 
-def getWeather():
-    weatherUgrndApi = "http://api.openweathermap.org/data/2.5/weather?q=reston"
-    r = requests.get(weatherUgrndApi)
-    response = json.loads(r.text)
+def getWeather(city):
+	weatherUgrndApiKey = "294eeb615c2db00471860d1c53b41902"
+	weatherUgrndApiUrl = "http://api.openweathermap.org/data/2.5/weather?q="+city+"&APPID="+weatherUgrndApiKey
+	r = requests.get(weatherUgrndApiUrl)
+	try:
+		response = json.loads(r.text)
 
-    curTemp = kelvinToFahr( float(response['main']['temp']) )
-    maxTemp = kelvinToFahr( float(response['main']['temp_max']) )
-    minTemp = kelvinToFahr( float(response['main']['temp_min']) )
-    humidity = response['main']['humidity']
+		curTemp = kelvinToFahr( float(response['main']['temp']) )
+		maxTemp = kelvinToFahr( float(response['main']['temp_max']) )
+		minTemp = kelvinToFahr( float(response['main']['temp_min']) )
+		humidity = response['main']['humidity']
 
-    displayStr = str(int(curTemp))+'`, '+'H:'+str(int(maxTemp))+'` L:'+str(int(minTemp))+"`"
-    return displayStr
+		displayStr = str(int(curTemp))+'`, '+'H:'+str(int(maxTemp))+'` L:'+str(int(minTemp))+"`"
+	except:
+		print "Whoa Snap! Something went wrong. Returning empty weather string\n"
+		print sys.exc_info()[0]
+		displayStr = ""
+	return displayStr
 
 def getTime():
 	timestr = now.strftime("%I:%M %p, %m/%d/%y")
@@ -115,7 +122,7 @@ def getTime():
 
 
 #####################  MAIN  ######################
-dispStr = getTime()+"  "+"  "+getWeather()+"  "+getCinemaString()
+dispStr = getTime()+"  "+"  "+getWeather("reston")+"  "+getCinemaString()
 
 print "DisplayString: \n " + dispStr
 clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
