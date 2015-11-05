@@ -48,13 +48,18 @@ def getCinemaString():
 						timeString = timeString.replace('(',"")
 						timeString = timeString.replace(')',"")
 
+						# We usually don't care about morning shows
 						if( ('AM' not in timeString) or INCLUDE_AM):
 							hour = int(timeString.split(':')[0])
 							# compensate for the whole 24 hour madness
 							if( hour!=12 ):
 								hour+=12
 
-							mins = int(timeString.split(':')[1])
+							mins = timeString.split(':')[1]
+							indexOfPM = mins.find('PM')
+							if indexOfPM > 0:
+								mins = mins[0:indexOfPM]
+
 							showTime = datetime.datetime.now()
 							showTime = showTime.replace(hour=int(int(hour)), minute=int(mins), second=0, microsecond=0)
 							
@@ -122,7 +127,11 @@ def getTime():
 
 
 #####################  MAIN  ######################
-dispStr = getTime()+"  "+"  "+getWeather("reston")+"  "+getCinemaString()
+try:
+	dispStr = getTime()+"  "+"  "+getWeather("reston")+"  "+getCinemaString()
+except:
+	print "Something bad happened"
+	dispStr = "Something bad happened"
 
 print "DisplayString: \n " + dispStr
 clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
