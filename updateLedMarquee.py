@@ -135,7 +135,7 @@ except:
 
 print "DisplayString: \n " + dispStr
 clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientsocket.connect(('192.168.1.12', 1336))
+clientsocket.connect(('192.168.1.201', 1336))
 clientsocket.send(dispStr)
 
 # Add this in so I can tell if the cron job actually ran.
