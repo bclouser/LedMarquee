@@ -19,6 +19,12 @@ typedef int regoff_t;
 #include "wifi.h"
 #include "networkCredentials.h"
 
+#define XSTR(x) STR(x)
+#define STR(x) #x
+
+#define WIFI_ID_AND_PASS_CMD "AT+CWJAP="WIFI_SSID","WIFI_PSWD""
+/*#pragma message "The value of WIFI_ID_AND_PASS_CMD: " XSTR(WIFI_ID_AND_PASS_CMD) */
+
 // A regular command returns OK when good, ERROR when failed
 bool processRegularCommand(char* atCommand, char* waitForString, unsigned retryLimit, char* response, unsigned maxLen)
 {
