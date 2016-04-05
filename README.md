@@ -5,7 +5,7 @@ Building
 --------
 
 create the file "networkCredentials.h" in the root directory and make it look like this:
-'''c
+```C
 #ifndef _NETWORK_CREDENTIALS_
 #define _NETWORK_CREDENTIALS_
 
@@ -14,6 +14,6 @@ create the file "networkCredentials.h" in the root directory and make it look li
 #define WIFI_PSWD "SomethingSecret"
 
 #endif
-'''
+```
 
 
